@@ -49,6 +49,9 @@
       normal-zsh = ''${cfg.package}/bin/zsh -i'';
       shim-zsh = ''${zshi}/bin/zshi ". ${extra-init}"'';
       zsh-command = if strToBool(cfg.extraInit) then shim-zsh else normal-zsh;
+      # Escape double quotes so zsh-command can be safely embedded inside
+      # a double-quoted PROMPT_COMMAND assignment.
+      zsh-command-escaped = builtins.replaceStrings ["\""] ["\\\""] zsh-command;
     in
       lib.mkIf cfg.enable {
         enterShell = lib.mkAfter ''
@@ -68,7 +71,11 @@
             # interactive (i.e. not for "devenv shell -- command").  This is
             # also required for devenv 2.x where enterShell runs inside a
             # script that must complete before the interactive shell starts.
-            export PROMPT_COMMAND='''unset PROMPT_COMMAND; exec ${zsh-command}'''
+            export PROMPT_COMMAND="unset PROMPT_COMMAND; exec ${zsh-command-escaped}"
+          else
+            # DEVENV_CMDLINE is set but doesn't contain "shell" (e.g., direnv).
+            # The user is already in their shell, so just source extraInit directly.
+            . ${extra-init}
           fi
         fi
       '';
